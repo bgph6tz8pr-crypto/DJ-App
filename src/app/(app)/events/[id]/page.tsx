@@ -17,6 +17,7 @@ import {
   Pencil,
   Music2,
   Megaphone,
+  Share2,
 } from "lucide-react";
 import {
   formatDateTime,
@@ -170,14 +171,25 @@ export default async function EventOverviewPage({ params }: Props) {
             )}
           </div>
 
-          {/* My role */}
-          {myMembership && (
-            <div className="flex-shrink-0">
+          {/* Right column: role + share */}
+          <div className="flex-shrink-0 flex flex-col items-end gap-3">
+            {myMembership && (
               <div className={`badge ${getRoleColor(myMembership.role)}`}>
                 My role: {myMembership.role}
               </div>
-            </div>
-          )}
+            )}
+            {event.isPublic && (
+              <Link
+                href={`/e/${event.id}`}
+                target="_blank"
+                className="flex items-center gap-1.5 text-xs text-dj-muted hover:text-dj-primary-light border border-dj-border hover:border-dj-primary/30 rounded-lg px-3 py-1.5 transition-all"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Public Page
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
