@@ -67,11 +67,14 @@ export default function NewEventPage() {
         ? new Date(`${form.startDate}T${form.doorsOpenTime}`)
         : null;
 
+      // strip time-only fields that don't exist in the DB schema
+      const { startTime: _st, endTime: _et, doorsOpenTime: _dot, ...formData } = form;
+
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          ...formData,
           startDate,
           endDate,
           doorsOpen,
