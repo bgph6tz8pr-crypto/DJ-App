@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String?
+  name      String?
+  image     String?
+  role      String   @default("ORGANIZER")
+  bio       String?
+  phone     String?
+  instagram String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventMemberships EventMember[]
+  tasksAssigned    Task[]        @relation("AssignedTasks")
+  messagesSent     Message[]
+  createdEvents    Event[]       @relation("CreatedEvents")
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  name        String
+  tagline     String?
+  description String?
+  venue       String?
+  address     String?
+  city        String?
+  state       String?
+  startDate   DateTime
+  endDate     DateTime?
+  doorsOpen   DateTime?
+  status      String    @default("PLANNING")
+  coverImage  String?
+  ticketUrl   String?
+  capacity    Int?
+  price       Float?
+  currency    String    @default("USD")
+  isPublic    Boolean   @default(true)
+  dresscode   String?
+  ageLimit    String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  createdBy      User?           @relation("CreatedEvents", fields: [createdById], references: [id])
+  members        EventMember[]
+  djs            EventDJ[]
+  genres         EventGenre[]
+  tasks          Task[]
+  messages       Message[]
+  mediaItems     MediaItem[]
+  scheduleItems  ScheduleItem[]
+  flyerAssets    FlyerAsset[]
+  marketingPosts MarketingPost[]
+}
+
+model EventMember {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  role      String   @default("STAFF")
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+}
+
+model EventDJ {
+  id              String   @id @default(cuid())
+  eventId         String
+  name            String
+  bio             String?
+  image           String?
+  instagramHandle String?
+  setTime         String?
+  setDuration     Int?
+  genres          String?
+  order           Int      @default(0)
+  featured        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventGenre {
+  id      String @id @default(cuid())
+  eventId String
+  genre   String
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  eventId     String
+  title       String
+  description String?
+  status      String    @default("TODO")
+  priority    String    @default("MEDIUM")
+  category    String?
+  assigneeId  String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  event    Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assignee User? @relation("AssignedTasks", fields: [assigneeId], references: [id])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  content   String
+  type      String   @default("TEXT")
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+model MediaItem {
+  id              String   @id @default(cuid())
+  eventId         String
+  url             String
+  thumbnailUrl    String?
+  type            String
+  caption         String?
+  uploadedById    String?
+  featured        Boolean  @default(false)
+  instagramPosted Boolean  @default(false)
+  instagramCaption String?
+  tags            String?
+  createdAt       DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model ScheduleItem {
+  id          String    @id @default(cuid())
+  eventId     String
+  title       String
+  description String?
+  type        String    @default("GENERAL")
+  startTime   DateTime
+  endTime     DateTime?
+  assignee    String?
+  color       String?
+  completed   Boolean   @default(false)
+  order       Int       @default(0)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model FlyerAsset {
+  id          String   @id @default(cuid())
+  eventId     String
+  name        String
+  url         String
+  type        String
+  djId        String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model MarketingPost {
+  id          String    @id @default(cuid())
+  eventId     String
+  platform    String
+  content     String
+  imageUrl    String?
+  hashtags    String?
+  status      String    @default("DRAFT")
+  scheduledAt DateTime?
+  postedAt    DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
