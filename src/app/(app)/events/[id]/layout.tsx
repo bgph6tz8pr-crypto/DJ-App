@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { EventNav } from "@/components/layout/event-nav";
+import AIChatPanel from "@/components/ai-chat-panel";
 
 interface Props {
   children: React.ReactNode;
@@ -40,6 +41,7 @@ export default async function EventLayout({ children, params }: Props) {
         eventStatus={event.status}
       />
       <div className="flex-1 p-4 md:p-6">{children}</div>
+      <AIChatPanel eventId={event.id} eventName={event.name} />
     </div>
   );
 }
