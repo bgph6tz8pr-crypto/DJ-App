@@ -13,6 +13,7 @@ import {
   ImageIcon,
   ChevronLeft,
 } from "lucide-react";
+import ExportForClaudeButton from "@/app/(app)/events/[id]/export-for-claude-button";
 
 interface EventNavProps {
   eventId: string;
@@ -69,6 +70,9 @@ export function EventNav({ eventId, eventName, eventStatus }: EventNavProps) {
             className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusColors[eventStatus] ?? "bg-slate-500"}`}
           />
           <span className="text-dj-muted text-xs">{eventStatus}</span>
+          <div className="ml-auto flex-shrink-0">
+            <ExportForClaudeButton eventId={eventId} eventName={eventName} />
+          </div>
         </div>
       </div>
 
