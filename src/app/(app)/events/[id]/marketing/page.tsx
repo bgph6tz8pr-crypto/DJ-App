@@ -6,7 +6,7 @@ import {
   Plus, Loader2, Upload, Image, Instagram, Facebook, Twitter, X, Trash2,
   ExternalLink, Copy, Check, Megaphone, Linkedin, Mail, MessageSquare,
   AtSign, Calendar, Clock, Zap, AlertCircle, Link, LayoutTemplate,
-  CheckSquare, Circle, BookMarked,
+  CheckSquare, Circle, BookMarked, Edit2,
 } from "lucide-react";
 import { formatDate, formatTime, getPriorityColor } from "@/lib/utils";
 
@@ -231,6 +231,7 @@ export default function MarketingPage() {
   const [tasks, setTasks] = useState<CampaignTask[]>([]);
   const [showMilestoneForm, setShowMilestoneForm] = useState(false);
   const [milestoneForm, setMilestoneForm] = useState({ label: "", date: "", emoji: "📌", tip: "" });
+  const [editingCustomId, setEditingCustomId] = useState<string | null>(null);
   const [quickTaskFor, setQuickTaskFor] = useState<{ date: string; label: string } | null>(null);
   const [quickTaskTitle, setQuickTaskTitle] = useState("");
   const [quickTaskLoading, setQuickTaskLoading] = useState(false);
@@ -381,17 +382,37 @@ export default function MarketingPage() {
     });
   }
 
-  function addCustomMilestone() {
-    if (!milestoneForm.label.trim() || !milestoneForm.date) return;
-    const newM: CustomMilestone = {
-      id: crypto.randomUUID(),
-      label: milestoneForm.label.trim(),
-      date:  milestoneForm.date,
-      emoji: milestoneForm.emoji || "📌",
-      tip:   milestoneForm.tip.trim(),
-    };
-    setCustomMilestones(ms => [...ms, newM]);
+  function openNewMilestone() {
+    setEditingCustomId(null);
     setMilestoneForm({ label: "", date: "", emoji: "📌", tip: "" });
+    setShowMilestoneForm(true);
+  }
+
+  function openEditMilestone(m: CustomMilestone) {
+    setEditingCustomId(m.id);
+    setMilestoneForm({ label: m.label, date: m.date, emoji: m.emoji, tip: m.tip });
+    setShowMilestoneForm(true);
+  }
+
+  function saveMilestoneForm() {
+    if (!milestoneForm.label.trim() || !milestoneForm.date) return;
+    if (editingCustomId) {
+      setCustomMilestones(ms => ms.map(m =>
+        m.id === editingCustomId
+          ? { ...m, label: milestoneForm.label.trim(), date: milestoneForm.date, emoji: milestoneForm.emoji || "📌", tip: milestoneForm.tip.trim() }
+          : m
+      ));
+    } else {
+      setCustomMilestones(ms => [...ms, {
+        id: crypto.randomUUID(),
+        label: milestoneForm.label.trim(),
+        date:  milestoneForm.date,
+        emoji: milestoneForm.emoji || "📌",
+        tip:   milestoneForm.tip.trim(),
+      }]);
+    }
+    setMilestoneForm({ label: "", date: "", emoji: "📌", tip: "" });
+    setEditingCustomId(null);
     setShowMilestoneForm(false);
   }
 
@@ -686,7 +707,7 @@ export default function MarketingPage() {
               <h2 className="section-title">Campaign Planner</h2>
               <p className="text-xs text-dj-muted mt-0.5">Timeline of posts and tasks leading up to your event</p>
             </div>
-            <button onClick={() => setShowMilestoneForm(true)} className="btn-secondary text-sm flex items-center gap-1.5">
+            <button onClick={openNewMilestone} className="btn-secondary text-sm flex items-center gap-1.5">
               <Plus className="w-4 h-4" /> Add Milestone
             </button>
           </div>
@@ -871,10 +892,16 @@ export default function MarketingPage() {
                         <BookMarked className="w-3 h-3" /> Task
                       </button>
                       {m.isCustom && (
-                        <button onClick={() => deleteCustomMilestone(m.key)}
-                          className="flex items-center gap-1.5 text-xs text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 transition-colors">
-                          <Trash2 className="w-3 h-3" /> Remove
-                        </button>
+                        <>
+                          <button onClick={() => { const cm = customMilestones.find(c => c.id === m.key); if (cm) openEditMilestone(cm); }}
+                            className="flex items-center gap-1.5 text-xs btn-secondary px-3 py-1.5">
+                            <Edit2 className="w-3 h-3" /> Edit
+                          </button>
+                          <button onClick={() => deleteCustomMilestone(m.key)}
+                            className="flex items-center gap-1.5 text-xs text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 transition-colors">
+                            <Trash2 className="w-3 h-3" /> Remove
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -914,15 +941,16 @@ export default function MarketingPage() {
         </div>
       )}
 
-      {/* ── ADD MILESTONE MODAL ─────────────────────────────────────────────── */}
+      {/* ── ADD / EDIT MILESTONE MODAL ──────────────────────────────────────── */}
       {showMilestoneForm && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-dj-800 border border-dj-border rounded-xl w-full max-w-md p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-semibold text-white flex items-center gap-2">
-                <BookMarked className="w-4 h-4 text-dj-primary" /> Add Milestone
+                <BookMarked className="w-4 h-4 text-dj-primary" />
+                {editingCustomId ? "Edit Milestone" : "Add Milestone"}
               </h3>
-              <button onClick={() => setShowMilestoneForm(false)} className="text-dj-muted hover:text-dj-text">
+              <button onClick={() => { setShowMilestoneForm(false); setEditingCustomId(null); }} className="text-dj-muted hover:text-dj-text">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -955,11 +983,11 @@ export default function MarketingPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowMilestoneForm(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={addCustomMilestone}
+              <button onClick={() => { setShowMilestoneForm(false); setEditingCustomId(null); }} className="btn-secondary flex-1">Cancel</button>
+              <button onClick={saveMilestoneForm}
                 disabled={!milestoneForm.label.trim() || !milestoneForm.date}
                 className="btn-primary flex-1">
-                Add Milestone
+                {editingCustomId ? "Save Changes" : "Add Milestone"}
               </button>
             </div>
           </div>
