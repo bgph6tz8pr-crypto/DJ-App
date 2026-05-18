@@ -28,6 +28,7 @@ import {
   timeAgo,
 } from "@/lib/utils";
 import EditEventButton from "./edit-event-button";
+import ExportForClaudeButton from "./export-for-claude-button";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -179,6 +180,7 @@ export default async function EventOverviewPage({ params }: Props) {
                 My role: {myMembership.role}
               </div>
             )}
+            <ExportForClaudeButton eventId={event.id} eventName={event.name} />
             {myMembership?.role === "ORGANIZER" && (
               <EditEventButton event={{
                 id:          event.id,
