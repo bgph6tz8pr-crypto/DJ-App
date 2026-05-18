@@ -27,6 +27,7 @@ import {
   getInitials,
   timeAgo,
 } from "@/lib/utils";
+import EditEventButton from "./edit-event-button";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -177,6 +178,21 @@ export default async function EventOverviewPage({ params }: Props) {
               <div className={`badge ${getRoleColor(myMembership.role)}`}>
                 My role: {myMembership.role}
               </div>
+            )}
+            {myMembership?.role === "ORGANIZER" && (
+              <EditEventButton event={{
+                id:          event.id,
+                name:        event.name,
+                tagline:     event.tagline     ?? null,
+                description: event.description ?? null,
+                status:      event.status,
+                startDate:   event.startDate instanceof Date ? event.startDate.toISOString() : String(event.startDate),
+                endDate:     event.endDate   ? (event.endDate   instanceof Date ? event.endDate.toISOString()   : String(event.endDate))   : null,
+                doorsOpen:   event.doorsOpen ? (event.doorsOpen instanceof Date ? event.doorsOpen.toISOString() : String(event.doorsOpen)) : null,
+                ticketUrl:   event.ticketUrl  ?? null,
+                price:       event.price      ?? null,
+                isPublic:    event.isPublic,
+              }} />
             )}
             {event.isPublic && (
               <Link
