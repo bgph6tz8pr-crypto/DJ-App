@@ -140,80 +140,89 @@ export default function TeamPage() {
             <Users className="w-4 h-4 text-dj-primary" /> Add Team Member
           </h3>
           <p className="text-xs text-dj-muted mb-4">
-            Select a member from the site to add them to this event.
+            Search for a registered user to add them to this event.
           </p>
-          {inviteError && <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg mb-3">{inviteError}</div>}
-          {inviteSuccess && <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm px-3 py-2 rounded-lg mb-3">{inviteSuccess}</div>}
+          {inviteError && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg mb-3">{inviteError}</div>
+          )}
+          {inviteSuccess && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm px-3 py-2 rounded-lg mb-3">{inviteSuccess}</div>
+          )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* User picker */}
-            <div className="relative flex-1" ref={dropdownRef}>
-              <div className={`input-field flex items-center gap-2 cursor-text ${selectedUser ? "border-dj-primary/40" : ""}`}
-                onClick={() => { setShowDropdown(true); }}>
-                <Search className="w-4 h-4 text-dj-muted flex-shrink-0" />
-                {selectedUser ? (
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="avatar w-5 h-5 bg-dj-primary/20 text-dj-primary-light text-xs flex-shrink-0">
-                      {getInitials(selectedUser.name)}
-                    </div>
-                    <span className="text-sm text-white truncate">{selectedUser.name ?? selectedUser.email}</span>
-                    <span className="text-xs text-dj-muted truncate">{selectedUser.name ? selectedUser.email : ""}</span>
-                    <button onClick={(e) => { e.stopPropagation(); setSelectedUser(null); setUserSearch(""); }}
-                      className="ml-auto text-dj-muted hover:text-dj-text flex-shrink-0">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <input
-                    type="text"
-                    value={userSearch}
-                    onChange={e => { setUserSearch(e.target.value); setShowDropdown(true); }}
-                    onFocus={() => setShowDropdown(true)}
-                    placeholder="Search by name or email..."
-                    className="flex-1 bg-transparent outline-none text-sm text-dj-text placeholder-dj-muted"
-                  />
+          <div className="flex flex-col sm:flex-row gap-3 items-start">
+            {/* Searchable user picker */}
+            <div className="relative flex-1 w-full" ref={dropdownRef}>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dj-muted pointer-events-none" />
+                <input
+                  type="text"
+                  autoComplete="off"
+                  placeholder="Search by name or email..."
+                  value={selectedUser ? (selectedUser.name ?? selectedUser.email) : userSearch}
+                  onChange={e => {
+                    setSelectedUser(null);
+                    setUserSearch(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  className={`input-field pl-9 ${selectedUser ? "pr-9 border-dj-primary/50 bg-dj-primary/5" : ""}`}
+                  readOnly={!!selectedUser}
+                />
+                {selectedUser && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedUser(null); setUserSearch(""); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-dj-muted hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 )}
               </div>
 
-              {showDropdown && !selectedUser && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-dj-800 border border-dj-border rounded-xl shadow-xl z-30 max-h-56 overflow-y-auto">
-                  {(() => {
-                    const filtered = siteUsers.filter(u =>
-                      !userSearch ||
-                      u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-                      u.email.toLowerCase().includes(userSearch.toLowerCase())
-                    );
-                    if (filtered.length === 0) return (
-                      <div className="px-4 py-3 text-sm text-dj-muted text-center">
-                        {siteUsers.length === 0 ? "No other users on this site yet." : "No users match your search."}
-                      </div>
-                    );
-                    return filtered.map(u => (
-                      <button key={u.id}
-                        onMouseDown={e => e.preventDefault()}
-                        onClick={() => { setSelectedUser(u); setUserSearch(""); setShowDropdown(false); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dj-700 transition-colors text-left">
-                        <div className="avatar w-8 h-8 bg-dj-primary/20 text-dj-primary-light text-xs flex-shrink-0">
-                          {getInitials(u.name)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-dj-text truncate">{u.name ?? "Unnamed"}</p>
-                          <p className="text-xs text-dj-muted truncate">{u.email}</p>
-                        </div>
-                        <span className="text-xs text-dj-muted flex-shrink-0">{u.role}</span>
-                      </button>
-                    ));
-                  })()}
-                </div>
-              )}
+              {showDropdown && !selectedUser && (() => {
+                const filtered = siteUsers.filter(u =>
+                  !userSearch ||
+                  (u.name ?? "").toLowerCase().includes(userSearch.toLowerCase()) ||
+                  u.email.toLowerCase().includes(userSearch.toLowerCase())
+                );
+                return (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-dj-800 border border-dj-border rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto">
+                    {filtered.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-dj-muted text-center">
+                        {siteUsers.length === 0 ? "No other users on the site yet." : "No users match your search."}
+                      </p>
+                    ) : (
+                      filtered.map(u => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setSelectedUser(u); setShowDropdown(false); setUserSearch(""); }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dj-700 transition-colors text-left first:rounded-t-xl last:rounded-b-xl"
+                        >
+                          <div className="avatar w-8 h-8 bg-dj-primary/20 text-dj-primary-light text-xs flex-shrink-0">
+                            {getInitials(u.name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{u.name ?? "Unnamed"}</p>
+                            <p className="text-xs text-dj-muted truncate">{u.email}</p>
+                          </div>
+                          <span className="text-xs text-dj-muted bg-dj-700 px-2 py-0.5 rounded flex-shrink-0">{u.role}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
-            <select value={inviteRole} onChange={e => setInviteRole(e.target.value)} className="input-field sm:w-40">
+            <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
+              className="input-field sm:w-40 flex-shrink-0">
               {EVENT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
 
             <button onClick={handleInvite} disabled={inviteLoading || !selectedUser}
-              className="btn-primary flex items-center gap-2 justify-center disabled:opacity-50">
+              className="btn-primary flex items-center gap-2 justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
               {inviteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               Add
             </button>
