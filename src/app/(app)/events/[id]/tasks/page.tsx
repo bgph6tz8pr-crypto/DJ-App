@@ -3,20 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import {
-  CheckSquare,
-  Plus,
-  Loader2,
-  X,
-  Trash2,
-  ChevronDown,
-  Circle,
-  AlertCircle,
-  Clock,
-  CheckCircle2,
-  XCircle,
+  CheckSquare, Plus, Loader2, X, Trash2, ChevronDown,
+  Circle, AlertCircle, Clock, CheckCircle2, XCircle, Edit2,
 } from "lucide-react";
-import { getInitials, getPriorityColor, TASK_CATEGORIES } from "@/lib/utils";
-import { formatDate } from "@/lib/utils";
+import { getInitials, getPriorityColor, TASK_CATEGORIES, formatDate } from "@/lib/utils";
 
 interface Task {
   id: string;
@@ -37,31 +27,30 @@ interface TeamMember {
 }
 
 const STATUS_COLUMNS = [
-  { key: "TODO", label: "To Do", icon: Circle, color: "text-slate-400" },
-  { key: "IN_PROGRESS", label: "In Progress", icon: Clock, color: "text-blue-400" },
-  { key: "DONE", label: "Done", icon: CheckCircle2, color: "text-emerald-400" },
-  { key: "BLOCKED", label: "Blocked", icon: XCircle, color: "text-red-400" },
+  { key: "TODO",        label: "To Do",       icon: Circle,       color: "text-slate-400" },
+  { key: "IN_PROGRESS", label: "In Progress", icon: Clock,        color: "text-blue-400" },
+  { key: "DONE",        label: "Done",        icon: CheckCircle2, color: "text-emerald-400" },
+  { key: "BLOCKED",     label: "Blocked",     icon: XCircle,      color: "text-red-400" },
 ];
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
+const EMPTY_FORM = {
+  title: "", description: "", priority: "MEDIUM",
+  category: "", assigneeId: "", dueDate: "", status: "TODO",
+};
+
 export default function TasksPage() {
   const { id } = useParams<{ id: string }>();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [tasks, setTasks]   = useState<Task[]>([]);
+  const [team, setTeam]     = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [formLoading, setFormLoading] = useState(false);
   const [filter, setFilter] = useState("all");
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    priority: "MEDIUM",
-    category: "",
-    assigneeId: "",
-    dueDate: "",
-    status: "TODO",
-  });
+
+  const [showForm, setShowForm]     = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_FORM });
 
   const fetchData = useCallback(async () => {
     const [tasksRes, teamRes] = await Promise.all([
@@ -75,26 +64,66 @@ export default function TasksPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  async function createTask() {
+  function openCreate() {
+    setEditingTask(null);
+    setForm({ ...EMPTY_FORM });
+    setShowForm(true);
+  }
+
+  function openEdit(task: Task) {
+    setEditingTask(task);
+    setForm({
+      title:       task.title,
+      description: task.description ?? "",
+      priority:    task.priority,
+      category:    task.category ?? "",
+      assigneeId:  task.assigneeId ?? "",
+      dueDate:     task.dueDate ? task.dueDate.split("T")[0] : "",
+      status:      task.status,
+    });
+    setShowForm(true);
+  }
+
+  async function saveTask() {
     if (!form.title.trim()) return;
     setFormLoading(true);
     try {
-      await fetch(`/api/events/${id}/tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          assigneeId: form.assigneeId || null,
-          dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
-          category: form.category || null,
-        }),
-      });
+      const payload = {
+        ...form,
+        assigneeId: form.assigneeId || null,
+        dueDate:    form.dueDate ? new Date(form.dueDate).toISOString() : null,
+        category:   form.category || null,
+      };
+
+      if (editingTask) {
+        await fetch(`/api/events/${id}/tasks/${editingTask.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetch(`/api/events/${id}/tasks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
       setShowForm(false);
-      setForm({ title: "", description: "", priority: "MEDIUM", category: "", assigneeId: "", dueDate: "", status: "TODO" });
+      setEditingTask(null);
       fetchData();
     } finally {
       setFormLoading(false);
     }
+  }
+
+  async function toggleDone(task: Task) {
+    const newStatus = task.status === "DONE" ? "TODO" : "DONE";
+    await fetch(`/api/events/${id}/tasks/${task.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    setTasks(tasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
   }
 
   async function updateStatus(taskId: string, newStatus: string) {
@@ -112,12 +141,13 @@ export default function TasksPage() {
   }
 
   const filtered = filter === "all" ? tasks : tasks.filter(t => t.assigneeId === filter);
-
   const priorityOrder: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-dj-muted" /></div>;
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="w-6 h-6 animate-spin text-dj-muted" />
+    </div>
+  );
 
   return (
     <div className="max-w-full">
@@ -131,14 +161,13 @@ export default function TasksPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Filter by person */}
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="input-field py-1.5 text-sm w-auto">
             <option value="all">All members</option>
             {team.map(m => (
               <option key={m.user.id} value={m.user.id}>{m.user.name ?? m.user.email}</option>
             ))}
           </select>
-          <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-1.5 text-sm">
+          <button onClick={openCreate} className="btn-primary flex items-center gap-1.5 text-sm">
             <Plus className="w-4 h-4" /> New Task
           </button>
         </div>
@@ -148,10 +177,8 @@ export default function TasksPage() {
       {tasks.length > 0 && (
         <div className="mb-5">
           <div className="h-1.5 bg-dj-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-dj-primary to-emerald-500 rounded-full transition-all"
-              style={{ width: `${(tasks.filter(t => t.status === "DONE").length / tasks.length) * 100}%` }}
-            />
+            <div className="h-full bg-gradient-to-r from-dj-primary to-emerald-500 rounded-full transition-all"
+              style={{ width: `${(tasks.filter(t => t.status === "DONE").length / tasks.length) * 100}%` }} />
           </div>
         </div>
       )}
@@ -165,7 +192,6 @@ export default function TasksPage() {
 
           return (
             <div key={col.key} className="flex flex-col">
-              {/* Column header */}
               <div className="flex items-center gap-2 mb-3 px-1">
                 <col.icon className={`w-4 h-4 ${col.color}`} />
                 <span className="text-sm font-medium text-dj-text">{col.label}</span>
@@ -174,11 +200,27 @@ export default function TasksPage() {
                 </span>
               </div>
 
-              {/* Tasks */}
               <div className="space-y-2 flex-1">
                 {colTasks.map((task) => (
                   <div key={task.id} className="card p-3 group">
                     <div className="flex items-start gap-2">
+                      {/* Done checkbox */}
+                      <button
+                        onClick={() => toggleDone(task)}
+                        className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded border transition-all ${
+                          task.status === "DONE"
+                            ? "bg-emerald-500 border-emerald-500 text-white"
+                            : "border-dj-border hover:border-emerald-500"
+                        }`}
+                        title={task.status === "DONE" ? "Mark incomplete" : "Mark done"}
+                      >
+                        {task.status === "DONE" && (
+                          <svg viewBox="0 0 12 12" fill="none" className="w-full h-full p-0.5">
+                            <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </button>
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap mb-1">
                           {(task.priority === "URGENT" || task.priority === "HIGH") && (
@@ -195,17 +237,11 @@ export default function TasksPage() {
 
                         <div className="flex items-center gap-2 flex-wrap">
                           {task.category && (
-                            <span className="text-xs bg-dj-700 text-dj-muted px-1.5 py-0.5 rounded">
-                              {task.category}
-                            </span>
+                            <span className="text-xs bg-dj-700 text-dj-muted px-1.5 py-0.5 rounded">{task.category}</span>
                           )}
-                          <span className={`text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                            {task.priority}
-                          </span>
+                          <span className={`text-xs font-medium ${getPriorityColor(task.priority)}`}>{task.priority}</span>
                           {task.dueDate && (
-                            <span className="text-xs text-dj-muted">
-                              📅 {formatDate(task.dueDate, "MMM d")}
-                            </span>
+                            <span className="text-xs text-dj-muted">📅 {formatDate(task.dueDate, "MMM d")}</span>
                           )}
                         </div>
 
@@ -220,7 +256,7 @@ export default function TasksPage() {
                       </div>
                     </div>
 
-                    {/* Quick actions */}
+                    {/* Quick actions — visible on hover */}
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-dj-border/30 opacity-0 group-hover:opacity-100 transition-opacity">
                       <div className="relative group/menu">
                         <button className="text-xs text-dj-muted hover:text-dj-text flex items-center gap-0.5">
@@ -236,10 +272,18 @@ export default function TasksPage() {
                           ))}
                         </div>
                       </div>
-                      <button onClick={() => deleteTask(task.id)}
-                        className="text-dj-muted hover:text-red-400 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEdit(task)}
+                          className="p-1 text-dj-muted hover:text-dj-text hover:bg-dj-700 rounded transition-colors"
+                          title="Edit task">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => deleteTask(task.id)}
+                          className="p-1 text-dj-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                          title="Delete task">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -255,13 +299,15 @@ export default function TasksPage() {
         })}
       </div>
 
-      {/* New task form modal */}
+      {/* Create / Edit task modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-dj-800 border border-dj-border rounded-xl w-full max-w-md p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="font-semibold text-white">New Task</h3>
-              <button onClick={() => setShowForm(false)} className="text-dj-muted hover:text-dj-text"><X className="w-5 h-5" /></button>
+              <h3 className="font-semibold text-white">{editingTask ? "Edit Task" : "New Task"}</h3>
+              <button onClick={() => setShowForm(false)} className="text-dj-muted hover:text-dj-text">
+                <X className="w-5 h-5" />
+              </button>
             </div>
             <div className="space-y-3">
               <div>
@@ -290,6 +336,12 @@ export default function TasksPage() {
                 </div>
               </div>
               <div>
+                <label className="label">Status</label>
+                <select value={form.status} onChange={(e) => setForm(f => ({ ...f, status: e.target.value }))} className="input-field">
+                  {STATUS_COLUMNS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+              </div>
+              <div>
                 <label className="label">Assign To</label>
                 <select value={form.assigneeId} onChange={(e) => setForm(f => ({ ...f, assigneeId: e.target.value }))} className="input-field">
                   <option value="">Unassigned</option>
@@ -300,18 +352,11 @@ export default function TasksPage() {
                 <label className="label">Due Date</label>
                 <input type="date" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))} className="input-field" />
               </div>
-              <div>
-                <label className="label">Initial Status</label>
-                <select value={form.status} onChange={(e) => setForm(f => ({ ...f, status: e.target.value }))} className="input-field">
-                  {STATUS_COLUMNS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                </select>
-              </div>
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setShowForm(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={createTask} disabled={formLoading} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Create Task
+              <button onClick={saveTask} disabled={formLoading} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : editingTask ? "Save Changes" : "Create Task"}
               </button>
             </div>
           </div>
