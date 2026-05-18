@@ -6,6 +6,7 @@ import {
   Plus, Loader2, Upload, Image, Instagram, Facebook, Twitter, X, Trash2,
   ExternalLink, Copy, Check, Megaphone, Linkedin, Mail, MessageSquare,
   AtSign, Calendar, Clock, Zap, AlertCircle, Link, LayoutTemplate,
+  CheckSquare, Circle, BookMarked,
 } from "lucide-react";
 import { formatDate, formatTime } from "@/lib/utils";
 
@@ -14,6 +15,15 @@ import { formatDate, formatTime } from "@/lib/utils";
 interface FlyerAsset {
   id: string; name: string; url: string; type: string;
   description?: string | null; createdAt: string;
+}
+
+interface CampaignTask {
+  id: string; title: string; status: string;
+  priority: string; dueDate?: string | null;
+}
+
+interface CustomMilestone {
+  id: string; label: string; date: string; emoji: string; tip: string;
 }
 
 interface MarketingPost {
@@ -216,22 +226,42 @@ export default function MarketingPage() {
   const [milestoneDates, setMilestoneDates] = useState<Record<number, string>>({});
   const [editingMilestone, setEditingMilestone] = useState<number | null>(null);
 
+  // Custom milestones & tasks
+  const [customMilestones, setCustomMilestones] = useState<CustomMilestone[]>([]);
+  const [tasks, setTasks] = useState<CampaignTask[]>([]);
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [milestoneForm, setMilestoneForm] = useState({ label: "", date: "", emoji: "📌", tip: "" });
+  const [quickTaskFor, setQuickTaskFor] = useState<{ date: string; label: string } | null>(null);
+  const [quickTaskTitle, setQuickTaskTitle] = useState("");
+  const [quickTaskLoading, setQuickTaskLoading] = useState(false);
+
   // ── Data fetching ────────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
-    const [eRes, aRes, pRes] = await Promise.all([
+    const [eRes, aRes, pRes, tRes] = await Promise.all([
       fetch(`/api/events/${id}`),
       fetch(`/api/events/${id}/flyer-assets`),
       fetch(`/api/events/${id}/marketing-posts`),
+      fetch(`/api/events/${id}/tasks`),
     ]);
     if (eRes.ok) setEvent(await eRes.json());
     if (aRes.ok) setAssets(await aRes.json());
     if (pRes.ok) setPosts(await pRes.json());
+    if (tRes.ok) setTasks(await tRes.json());
     setLoading(false);
   }, [id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { setShareUrl(`${window.location.origin}/e/${id}`); }, [id]);
+
+  // Persist custom milestones per event in localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(`campaign_milestones_${id}`);
+    if (saved) setCustomMilestones(JSON.parse(saved));
+  }, [id]);
+  useEffect(() => {
+    localStorage.setItem(`campaign_milestones_${id}`, JSON.stringify(customMilestones));
+  }, [id, customMilestones]);
 
   // ── Asset helpers ─────────────────────────────────────────────────────────────
 
@@ -338,6 +368,54 @@ export default function MarketingPage() {
       const diff = Math.abs(new Date(p.scheduledAt).getTime() - mid);
       return diff <= TWO_DAYS;
     });
+  }
+
+  function getTasksNearDate(date: Date): CampaignTask[] {
+    const mid = date.getTime();
+    const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
+    return tasks.filter(t => {
+      if (!t.dueDate) return false;
+      return Math.abs(new Date(t.dueDate).getTime() - mid) <= THREE_DAYS;
+    });
+  }
+
+  function addCustomMilestone() {
+    if (!milestoneForm.label.trim() || !milestoneForm.date) return;
+    const newM: CustomMilestone = {
+      id: crypto.randomUUID(),
+      label: milestoneForm.label.trim(),
+      date:  milestoneForm.date,
+      emoji: milestoneForm.emoji || "📌",
+      tip:   milestoneForm.tip.trim(),
+    };
+    setCustomMilestones(ms => [...ms, newM]);
+    setMilestoneForm({ label: "", date: "", emoji: "📌", tip: "" });
+    setShowMilestoneForm(false);
+  }
+
+  function deleteCustomMilestone(milestoneId: string) {
+    setCustomMilestones(ms => ms.filter(m => m.id !== milestoneId));
+  }
+
+  async function createQuickTask() {
+    if (!quickTaskTitle.trim() || !quickTaskFor) return;
+    setQuickTaskLoading(true);
+    try {
+      await fetch(`/api/events/${id}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: quickTaskTitle.trim(),
+          priority: "MEDIUM",
+          status: "TODO",
+          category: "MARKETING",
+          dueDate: new Date(quickTaskFor.date).toISOString(),
+        }),
+      });
+      setQuickTaskFor(null);
+      setQuickTaskTitle("");
+      fetchData();
+    } finally { setQuickTaskLoading(false); }
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -556,22 +634,53 @@ export default function MarketingPage() {
       )}
 
       {/* ── CAMPAIGN PLANNER TAB ─────────────────────────────────────────────── */}
-      {activeTab === "campaign" && event && (
+      {activeTab === "campaign" && event && (() => {
+        // Combine built-in + custom milestones sorted by date
+        const allMilestones = [
+          ...CAMPAIGN_MILESTONES.map(m => ({
+            key: `builtin-${m.daysOffset}`,
+            label: m.label,
+            date: getMilestoneDate(m.daysOffset),
+            emoji: POST_TEMPLATES.find(t => t.id === m.templateId)?.emoji ?? "📌",
+            tip: m.tip,
+            templateId: m.templateId as string | null,
+            daysOffset: m.daysOffset as number | null,
+            isCustom: false,
+          })),
+          ...customMilestones.map(m => ({
+            key: m.id,
+            label: m.label,
+            date: new Date(m.date),
+            emoji: m.emoji,
+            tip: m.tip,
+            templateId: null,
+            daysOffset: null,
+            isCustom: true,
+          })),
+        ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+        return (
         <div>
-          <div className="mb-6">
-            <h2 className="section-title">Campaign Planner</h2>
-            <p className="text-xs text-dj-muted mt-0.5">Recommended posting schedule based on your event date</p>
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+            <div>
+              <h2 className="section-title">Campaign Planner</h2>
+              <p className="text-xs text-dj-muted mt-0.5">Timeline of posts and tasks leading up to your event</p>
+            </div>
+            <button onClick={() => setShowMilestoneForm(true)} className="btn-secondary text-sm flex items-center gap-1.5">
+              <Plus className="w-4 h-4" /> Add Milestone
+            </button>
           </div>
 
           {/* Summary stats */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-4 gap-3 mb-6">
             {[
-              { label: "Total Posts", value: posts.length },
+              { label: "Milestones", value: allMilestones.length },
+              { label: "Posts", value: posts.length },
               { label: "Scheduled", value: posts.filter(p => p.scheduledAt && p.status !== "POSTED").length },
-              { label: "Posted", value: posts.filter(p => p.status === "POSTED").length },
+              { label: "Tasks", value: tasks.filter(t => t.status !== "DONE").length + " open" },
             ].map(s => (
-              <div key={s.label} className="card p-4 text-center">
-                <p className="text-2xl font-bold text-dj-primary-light">{s.value}</p>
+              <div key={s.label} className="card p-3 text-center">
+                <p className="text-xl font-bold text-dj-primary-light">{s.value}</p>
                 <p className="text-xs text-dj-muted mt-0.5">{s.label}</p>
               </div>
             ))}
@@ -579,80 +688,125 @@ export default function MarketingPage() {
 
           {/* Milestones */}
           <div className="space-y-3">
-            {CAMPAIGN_MILESTONES.map((m) => {
-              const milestoneDate = getMilestoneDate(m.daysOffset);
+            {allMilestones.map((m) => {
               const now = new Date();
-              const daysUntil = Math.round((milestoneDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-              const isPast = milestoneDate < now;
-              const nearPosts = getPostsNearMilestone(m.daysOffset);
-              const covered = nearPosts.length > 0;
-              const tpl = POST_TEMPLATES.find(t => t.id === m.templateId)!;
+              const daysUntil = Math.round((m.date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              const isPast = m.date < now;
+              const nearPosts = m.daysOffset !== null
+                ? getPostsNearMilestone(m.daysOffset)
+                : (() => { const mid = m.date.getTime(); const TWO = 2*86400000; return posts.filter(p => p.scheduledAt && Math.abs(new Date(p.scheduledAt).getTime()-mid) <= TWO); })();
+              const nearTasks = getTasksNearDate(m.date);
+              const isQuickTaskOpen = quickTaskFor?.label === m.key;
 
               return (
-                <div key={m.daysOffset} className={`card p-4 border ${covered ? "border-emerald-500/20" : isPast ? "border-red-500/10" : "border-dj-border"}`}>
+                <div key={m.key} className={`card p-4 border ${nearPosts.length > 0 || nearTasks.length > 0 ? "border-emerald-500/20" : isPast ? "border-red-500/10" : "border-dj-border"}`}>
                   <div className="flex items-start gap-4">
                     {/* Date column */}
                     <div className="flex-shrink-0 text-center w-20">
-                      {editingMilestone === m.daysOffset ? (
-                        <input
-                          type="date"
-                          defaultValue={milestoneDate.toISOString().split("T")[0]}
-                          className="input-field text-xs px-1 py-1 w-full"
-                          autoFocus
+                      {editingMilestone === (m.daysOffset ?? -9999) ? (
+                        <input type="date"
+                          defaultValue={m.date.toISOString().split("T")[0]}
+                          className="input-field text-xs px-1 py-1 w-full" autoFocus
                           onBlur={(e) => {
-                            if (e.target.value) setMilestoneDates(d => ({ ...d, [m.daysOffset]: e.target.value }));
+                            if (e.target.value && m.daysOffset !== null) setMilestoneDates(d => ({ ...d, [m.daysOffset!]: e.target.value }));
                             setEditingMilestone(null);
                           }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                            if (e.key === "Escape") { setEditingMilestone(null); }
-                          }}
+                          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditingMilestone(null); }}
                         />
                       ) : (
-                        <button onClick={() => setEditingMilestone(m.daysOffset)}
-                          className="group text-center w-full hover:bg-dj-700 rounded-lg p-1 transition-colors">
-                          <p className="text-xs text-dj-muted group-hover:text-dj-primary-light">{formatDate(milestoneDate, "MMM d")}</p>
+                        <button onClick={() => m.daysOffset !== null && setEditingMilestone(m.daysOffset)}
+                          className={`group text-center w-full rounded-lg p-1 transition-colors ${m.daysOffset !== null ? "hover:bg-dj-700" : ""}`}>
+                          <p className="text-xs text-dj-muted group-hover:text-dj-primary-light">{formatDate(m.date, "MMM d")}</p>
                           <p className={`text-xs font-medium mt-0.5 ${isPast ? "text-dj-muted" : daysUntil <= 3 ? "text-amber-400" : "text-dj-text"}`}>
                             {isPast ? `${Math.abs(daysUntil)}d ago` : daysUntil === 0 ? "Today!" : `${daysUntil}d away`}
                           </p>
-                          <p className="text-xs text-dj-muted/50 group-hover:text-dj-muted mt-0.5">tap to edit</p>
+                          {m.daysOffset !== null && <p className="text-xs text-dj-muted/50 group-hover:text-dj-muted mt-0.5">edit date</p>}
                         </button>
                       )}
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-base">{tpl.emoji}</span>
+                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                        <span className="text-base">{m.emoji}</span>
                         <p className="font-medium text-sm text-dj-text">{m.label}</p>
-                        {covered ? (
+                        {nearPosts.length > 0 && (
                           <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full">
                             <Check className="w-3 h-3" /> {nearPosts.length} post{nearPosts.length !== 1 ? "s" : ""}
                           </span>
-                        ) : (
+                        )}
+                        {nearTasks.length > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-blue-400 bg-blue-400/10 border border-blue-400/20 px-2 py-0.5 rounded-full">
+                            <CheckSquare className="w-3 h-3" /> {nearTasks.length} task{nearTasks.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {nearPosts.length === 0 && nearTasks.length === 0 && (
                           <span className="flex items-center gap-1 text-xs text-dj-muted bg-dj-700 border border-dj-border px-2 py-0.5 rounded-full">
-                            <AlertCircle className="w-3 h-3" /> No posts
+                            <AlertCircle className="w-3 h-3" /> Nothing planned
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-dj-muted">{m.tip}</p>
-                      {covered && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
+                      {m.tip && <p className="text-xs text-dj-muted mb-2">{m.tip}</p>}
+
+                      {/* Linked posts */}
+                      {nearPosts.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-1.5">
                           {nearPosts.map(p => (
                             <span key={p.id} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${PLATFORM_COLORS[p.platform] ?? "text-dj-muted border-dj-border"}`}>
-                              <PlatformIcon platform={p.platform} className="w-3 h-3" />
-                              {p.platform}
+                              <PlatformIcon platform={p.platform} className="w-3 h-3" />{p.platform}
                             </span>
                           ))}
                         </div>
                       )}
+
+                      {/* Linked tasks */}
+                      {nearTasks.length > 0 && (
+                        <div className="space-y-1 mb-1.5">
+                          {nearTasks.map(t => (
+                            <div key={t.id} className="flex items-center gap-2">
+                              {t.status === "DONE"
+                                ? <CheckSquare className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                                : <Circle className="w-3 h-3 text-dj-muted flex-shrink-0" />}
+                              <span className={`text-xs ${t.status === "DONE" ? "line-through text-dj-muted" : "text-dj-text"}`}>{t.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Quick add task inline */}
+                      {isQuickTaskOpen && (
+                        <div className="flex gap-2 mt-2">
+                          <input autoFocus type="text" value={quickTaskTitle}
+                            onChange={e => setQuickTaskTitle(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") createQuickTask(); if (e.key === "Escape") setQuickTaskFor(null); }}
+                            placeholder="Task title..." className="input-field text-xs py-1 flex-1" />
+                          <button onClick={createQuickTask} disabled={quickTaskLoading} className="btn-primary text-xs px-3 py-1">
+                            {quickTaskLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
+                          </button>
+                          <button onClick={() => setQuickTaskFor(null)} className="btn-ghost text-xs px-2 py-1"><X className="w-3 h-3" /></button>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Action */}
-                    <button onClick={() => { openPostFormWithTemplate(m.templateId); setActiveTab("posts"); }}
-                      className="flex-shrink-0 flex items-center gap-1.5 text-xs btn-secondary px-3 py-1.5">
-                      <Zap className="w-3 h-3" /> Quick Create
-                    </button>
+                    {/* Actions */}
+                    <div className="flex flex-col gap-1.5 flex-shrink-0">
+                      {m.templateId && (
+                        <button onClick={() => { openPostFormWithTemplate(m.templateId!); setActiveTab("posts"); }}
+                          className="flex items-center gap-1.5 text-xs btn-secondary px-3 py-1.5">
+                          <Zap className="w-3 h-3" /> Post
+                        </button>
+                      )}
+                      <button onClick={() => { setQuickTaskFor({ date: m.date.toISOString().split("T")[0], label: m.key }); setQuickTaskTitle(""); }}
+                        className="flex items-center gap-1.5 text-xs btn-secondary px-3 py-1.5">
+                        <BookMarked className="w-3 h-3" /> Task
+                      </button>
+                      {m.isCustom && (
+                        <button onClick={() => deleteCustomMilestone(m.key)}
+                          className="flex items-center gap-1.5 text-xs text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 transition-colors">
+                          <Trash2 className="w-3 h-3" /> Remove
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -681,11 +835,64 @@ export default function MarketingPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {activeTab === "campaign" && !event && (
         <div className="card p-10 text-center">
           <p className="text-dj-muted text-sm">Event data not available.</p>
+        </div>
+      )}
+
+      {/* ── ADD MILESTONE MODAL ─────────────────────────────────────────────── */}
+      {showMilestoneForm && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-dj-800 border border-dj-border rounded-xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <BookMarked className="w-4 h-4 text-dj-primary" /> Add Milestone
+              </h3>
+              <button onClick={() => setShowMilestoneForm(false)} className="text-dj-muted hover:text-dj-text">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="label">Milestone Label *</label>
+                <input type="text" value={milestoneForm.label}
+                  onChange={e => setMilestoneForm(f => ({ ...f, label: e.target.value }))}
+                  className="input-field" placeholder="e.g. Press Release, Flyer Drop, Radio Spot..."
+                  autoFocus />
+              </div>
+              <div>
+                <label className="label">Date *</label>
+                <input type="date" value={milestoneForm.date}
+                  onChange={e => setMilestoneForm(f => ({ ...f, date: e.target.value }))}
+                  className="input-field" />
+              </div>
+              <div>
+                <label className="label">Emoji</label>
+                <input type="text" value={milestoneForm.emoji}
+                  onChange={e => setMilestoneForm(f => ({ ...f, emoji: e.target.value }))}
+                  className="input-field" placeholder="📌" maxLength={2} />
+              </div>
+              <div>
+                <label className="label">Tip / Notes</label>
+                <textarea value={milestoneForm.tip}
+                  onChange={e => setMilestoneForm(f => ({ ...f, tip: e.target.value }))}
+                  className="input-field" rows={2}
+                  placeholder="What should happen at this milestone?" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowMilestoneForm(false)} className="btn-secondary flex-1">Cancel</button>
+              <button onClick={addCustomMilestone}
+                disabled={!milestoneForm.label.trim() || !milestoneForm.date}
+                className="btn-primary flex-1">
+                Add Milestone
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

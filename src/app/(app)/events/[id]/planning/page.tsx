@@ -92,6 +92,14 @@ export default function PlanningPage() {
   });
   const [schedLoading, setSchedLoading] = useState(false);
 
+  // Venue form
+  const [showVenueForm, setShowVenueForm] = useState(false);
+  const [venueForm, setVenueForm] = useState({
+    venue: "", address: "", city: "", state: "",
+    capacity: "", dresscode: "", ageLimit: "",
+  });
+  const [venueLoading, setVenueLoading] = useState(false);
+
   const fetchEvent = useCallback(async () => {
     const res = await fetch(`/api/events/${id}`);
     if (res.ok) setEvent(await res.json());
@@ -181,6 +189,43 @@ export default function PlanningPage() {
   async function deleteScheduleItem(itemId: string) {
     await fetch(`/api/events/${id}/schedule/${itemId}`, { method: "DELETE" });
     fetchEvent();
+  }
+
+  function openVenueForm() {
+    if (!event) return;
+    setVenueForm({
+      venue:     event.venue     ?? "",
+      address:   event.address   ?? "",
+      city:      event.city      ?? "",
+      state:     event.state     ?? "",
+      capacity:  event.capacity  != null ? event.capacity.toString() : "",
+      dresscode: event.dresscode ?? "",
+      ageLimit:  event.ageLimit  ?? "",
+    });
+    setShowVenueForm(true);
+  }
+
+  async function saveVenue() {
+    setVenueLoading(true);
+    try {
+      await fetch(`/api/events/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venue:     venueForm.venue     || null,
+          address:   venueForm.address   || null,
+          city:      venueForm.city      || null,
+          state:     venueForm.state     || null,
+          capacity:  venueForm.capacity  ? parseInt(venueForm.capacity)  : null,
+          dresscode: venueForm.dresscode || null,
+          ageLimit:  venueForm.ageLimit  || null,
+        }),
+      });
+      setShowVenueForm(false);
+      fetchEvent();
+    } finally {
+      setVenueLoading(false);
+    }
   }
 
   if (loading) {
@@ -469,43 +514,127 @@ export default function PlanningPage() {
 
       {/* Venue */}
       {activeTab === "venue" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="card p-5">
-            <h3 className="section-title flex items-center gap-2 mb-4">
-              <MapPin className="w-4 h-4 text-dj-primary" /> Venue
-            </h3>
-            <div className="space-y-2 text-sm">
-              {event.venue && <div><span className="text-dj-muted">Name:</span> <span className="text-white ml-2">{event.venue}</span></div>}
-              {event.address && <div><span className="text-dj-muted">Address:</span> <span className="text-white ml-2">{event.address}</span></div>}
-              {event.city && <div><span className="text-dj-muted">City:</span> <span className="text-white ml-2">{event.city}{event.state && `, ${event.state}`}</span></div>}
-              {!event.venue && !event.address && <p className="text-dj-muted">No venue details set.</p>}
-            </div>
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="section-title">Venue &amp; Details</h2>
+            <button onClick={openVenueForm} className="btn-primary text-sm flex items-center gap-1.5">
+              <Edit2 className="w-4 h-4" /> Edit Details
+            </button>
           </div>
-          <div className="card p-5">
-            <h3 className="section-title flex items-center gap-2 mb-4">
-              <Calendar className="w-4 h-4 text-dj-primary" /> Event Details
-            </h3>
-            <div className="space-y-2 text-sm">
-              <div><span className="text-dj-muted">Start:</span> <span className="text-white ml-2">{formatDateTime(event.startDate)}</span></div>
-              {event.endDate && <div><span className="text-dj-muted">End:</span> <span className="text-white ml-2">{formatDateTime(event.endDate)}</span></div>}
-              {event.doorsOpen && <div><span className="text-dj-muted">Doors:</span> <span className="text-white ml-2">{formatTime(event.doorsOpen)}</span></div>}
-              {event.capacity && <div><span className="text-dj-muted">Capacity:</span> <span className="text-white ml-2">{event.capacity.toLocaleString()}</span></div>}
-              {event.dresscode && <div><span className="text-dj-muted">Dress code:</span> <span className="text-white ml-2">{event.dresscode}</span></div>}
-              {event.ageLimit && <div><span className="text-dj-muted">Age:</span> <span className="text-white ml-2">{event.ageLimit}</span></div>}
-            </div>
-          </div>
-          <div className="card p-5">
-            <h3 className="section-title mb-3">Music Genres</h3>
-            {event.genres.length === 0 ? (
-              <p className="text-dj-muted text-sm">No genres set.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {event.genres.map(g => (
-                  <span key={g.id} className="badge bg-dj-primary/10 text-dj-primary-light border-dj-primary/20">{g.genre}</span>
-                ))}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="card p-5">
+              <h3 className="section-title flex items-center gap-2 mb-4">
+                <MapPin className="w-4 h-4 text-dj-primary" /> Venue
+              </h3>
+              <div className="space-y-2 text-sm">
+                {event.venue && <div><span className="text-dj-muted">Name:</span> <span className="text-white ml-2">{event.venue}</span></div>}
+                {event.address && <div><span className="text-dj-muted">Address:</span> <span className="text-white ml-2">{event.address}</span></div>}
+                {event.city && <div><span className="text-dj-muted">City:</span> <span className="text-white ml-2">{event.city}{event.state && `, ${event.state}`}</span></div>}
+                {!event.venue && !event.address && (
+                  <div className="text-center py-4">
+                    <p className="text-dj-muted text-sm mb-2">No venue details set.</p>
+                    <button onClick={openVenueForm} className="btn-secondary text-xs">Add Venue</button>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+            <div className="card p-5">
+              <h3 className="section-title flex items-center gap-2 mb-4">
+                <Calendar className="w-4 h-4 text-dj-primary" /> Event Details
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div><span className="text-dj-muted">Start:</span> <span className="text-white ml-2">{formatDateTime(event.startDate)}</span></div>
+                {event.endDate && <div><span className="text-dj-muted">End:</span> <span className="text-white ml-2">{formatDateTime(event.endDate)}</span></div>}
+                {event.doorsOpen && <div><span className="text-dj-muted">Doors:</span> <span className="text-white ml-2">{formatTime(event.doorsOpen)}</span></div>}
+                {event.capacity && <div><span className="text-dj-muted">Capacity:</span> <span className="text-white ml-2">{event.capacity.toLocaleString()}</span></div>}
+                {event.dresscode && <div><span className="text-dj-muted">Dress code:</span> <span className="text-white ml-2">{event.dresscode}</span></div>}
+                {event.ageLimit && <div><span className="text-dj-muted">Age:</span> <span className="text-white ml-2">{event.ageLimit}</span></div>}
+              </div>
+            </div>
+            <div className="card p-5">
+              <h3 className="section-title mb-3">Music Genres</h3>
+              {event.genres.length === 0 ? (
+                <p className="text-dj-muted text-sm">No genres set.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {event.genres.map(g => (
+                    <span key={g.id} className="badge bg-dj-primary/10 text-dj-primary-light border-dj-primary/20">{g.genre}</span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Venue edit modal */}
+          {showVenueForm && (
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+              <div className="bg-dj-800 border border-dj-border rounded-xl w-full max-w-lg p-6 shadow-2xl">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-dj-primary" /> Edit Venue &amp; Details
+                  </h3>
+                  <button onClick={() => setShowVenueForm(false)} className="text-dj-muted hover:text-dj-text">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="label">Venue Name</label>
+                    <input type="text" value={venueForm.venue}
+                      onChange={e => setVenueForm(f => ({ ...f, venue: e.target.value }))}
+                      className="input-field" placeholder="Club XYZ, Warehouse 23..." />
+                  </div>
+                  <div>
+                    <label className="label">Street Address</label>
+                    <input type="text" value={venueForm.address}
+                      onChange={e => setVenueForm(f => ({ ...f, address: e.target.value }))}
+                      className="input-field" placeholder="123 Main St" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">City</label>
+                      <input type="text" value={venueForm.city}
+                        onChange={e => setVenueForm(f => ({ ...f, city: e.target.value }))}
+                        className="input-field" placeholder="Miami" />
+                    </div>
+                    <div>
+                      <label className="label">State</label>
+                      <input type="text" value={venueForm.state}
+                        onChange={e => setVenueForm(f => ({ ...f, state: e.target.value }))}
+                        className="input-field" placeholder="FL" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Capacity</label>
+                    <input type="number" value={venueForm.capacity}
+                      onChange={e => setVenueForm(f => ({ ...f, capacity: e.target.value }))}
+                      className="input-field" placeholder="500" min="0" />
+                  </div>
+                  <div>
+                    <label className="label">Dress Code</label>
+                    <input type="text" value={venueForm.dresscode}
+                      onChange={e => setVenueForm(f => ({ ...f, dresscode: e.target.value }))}
+                      className="input-field" placeholder="Smart casual, All black..." />
+                  </div>
+                  <div>
+                    <label className="label">Age Restriction</label>
+                    <input type="text" value={venueForm.ageLimit}
+                      onChange={e => setVenueForm(f => ({ ...f, ageLimit: e.target.value }))}
+                      className="input-field" placeholder="21+, 18+, All ages..." />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-5">
+                  <button onClick={() => setShowVenueForm(false)} className="btn-secondary flex-1">Cancel</button>
+                  <button onClick={saveVenue} disabled={venueLoading}
+                    className="btn-primary flex-1 flex items-center justify-center gap-2">
+                    {venueLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    Save Details
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
