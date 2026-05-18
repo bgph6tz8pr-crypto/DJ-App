@@ -23,9 +23,15 @@ function toDateStr(iso: string) {
   return iso.split("T")[0];
 }
 
+// Always read/write times as UTC so display matches entry regardless of server timezone
 function toTimeStr(iso: string) {
   const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+// Build an ISO string treating the date+time inputs as UTC (no local offset applied)
+function toUTCIso(date: string, time: string) {
+  return `${date}T${time}:00.000Z`;
 }
 
 export default function EditEventButton({ event }: { event: EventEditData }) {
@@ -52,12 +58,12 @@ export default function EditEventButton({ event }: { event: EventEditData }) {
     if (!form.name.trim() || !form.startDate || !form.startTime) return;
     setLoading(true);
     try {
-      const startDate  = new Date(`${form.startDate}T${form.startTime}`).toISOString();
+      const startDate  = toUTCIso(form.startDate, form.startTime);
       const endDate    = form.endDate && form.endTime
-        ? new Date(`${form.endDate}T${form.endTime}`).toISOString()
+        ? toUTCIso(form.endDate, form.endTime)
         : null;
       const doorsOpen  = form.doorsOpenTime
-        ? new Date(`${form.startDate}T${form.doorsOpenTime}`).toISOString()
+        ? toUTCIso(form.startDate, form.doorsOpenTime)
         : null;
 
       const res = await fetch(`/api/events/${event.id}`, {

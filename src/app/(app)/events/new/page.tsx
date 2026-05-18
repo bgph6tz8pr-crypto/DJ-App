@@ -59,12 +59,12 @@ export default function NewEventPage() {
     setError("");
 
     try {
-      const startDate = new Date(`${form.startDate}T${form.startTime}`);
+      const startDate = `${form.startDate}T${form.startTime}:00.000Z`;
       const endDate = form.endDate
-        ? new Date(`${form.endDate}T${form.endTime}`)
+        ? `${form.endDate}T${form.endTime}:00.000Z`
         : null;
-      const doorsOpen = form.startDate
-        ? new Date(`${form.startDate}T${form.doorsOpenTime}`)
+      const doorsOpen = form.doorsOpenTime
+        ? `${form.startDate}T${form.doorsOpenTime}:00.000Z`
         : null;
 
       // strip time-only fields that don't exist in the DB schema

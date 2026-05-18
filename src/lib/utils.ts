@@ -6,27 +6,56 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(date: Date | string, fmt = "MMM d, yyyy") {
-  return format(new Date(date), fmt);
+const UTC_MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const UTC_MONTHS_LONG  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const UTC_DAYS_SHORT   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const UTC_DAYS_LONG    = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+function utcTimeTo12h(d: Date): string {
+  const h = d.getUTCHours(), m = d.getUTCMinutes();
+  const ampm = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
-export function formatTime(date: Date | string) {
-  return format(new Date(date), "h:mm a");
+export function formatDate(date: Date | string, fmt = "MMM d, yyyy"): string {
+  const d = new Date(date);
+  const M = d.getUTCMonth(), D = d.getUTCDate(), Y = d.getUTCFullYear(), DOW = d.getUTCDay();
+  return fmt
+    .replace("EEEE", UTC_DAYS_LONG[DOW])
+    .replace("EEE",  UTC_DAYS_SHORT[DOW])
+    .replace("MMMM", UTC_MONTHS_LONG[M])
+    .replace("MMM",  UTC_MONTHS_SHORT[M])
+    .replace("MM",   String(M + 1).padStart(2, "0"))
+    .replace(/\bd\b/, String(D))
+    .replace("dd",   String(D).padStart(2, "0"))
+    .replace("yyyy", String(Y))
+    .replace("yy",   String(Y).slice(-2));
 }
 
-export function formatDateTime(date: Date | string) {
-  return format(new Date(date), "MMM d, yyyy 'at' h:mm a");
+export function formatTime(date: Date | string): string {
+  return utcTimeTo12h(new Date(date));
+}
+
+export function formatDateTime(date: Date | string): string {
+  const d = new Date(date);
+  return `${UTC_MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()} at ${utcTimeTo12h(d)}`;
 }
 
 export function timeAgo(date: Date | string) {
   return formatDistanceToNow(new Date(date), { addSuffix: true });
 }
 
-export function formatEventDate(date: Date | string) {
+export function formatEventDate(date: Date | string): string {
   const d = new Date(date);
-  if (isToday(d)) return `Today at ${formatTime(d)}`;
-  if (isTomorrow(d)) return `Tomorrow at ${formatTime(d)}`;
-  return format(d, "EEE, MMM d 'at' h:mm a");
+  const now = new Date();
+  const sameUTCDay = (a: Date, b: Date) =>
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth()    === b.getUTCMonth()    &&
+    a.getUTCDate()     === b.getUTCDate();
+  const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  if (sameUTCDay(d, now))      return `Today at ${utcTimeTo12h(d)}`;
+  if (sameUTCDay(d, tomorrow)) return `Tomorrow at ${utcTimeTo12h(d)}`;
+  return `${UTC_DAYS_SHORT[d.getUTCDay()]}, ${UTC_MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()} at ${utcTimeTo12h(d)}`;
 }
 
 export function getStatusColor(status: string): string {

@@ -168,9 +168,9 @@ export default function PlanningPage() {
     if (!schedForm.title.trim() || !schedForm.startDate || !schedForm.startTime) return;
     setSchedLoading(true);
     try {
-      const startTime = new Date(`${schedForm.startDate}T${schedForm.startTime}`);
+      const startTime = `${schedForm.startDate}T${schedForm.startTime}:00.000Z`;
       const endTime = schedForm.endTime
-        ? new Date(`${schedForm.startDate}T${schedForm.endTime}`)
+        ? `${schedForm.startDate}T${schedForm.endTime}:00.000Z`
         : null;
 
       await fetch(`/api/events/${id}/schedule`, {
