@@ -8,7 +8,7 @@ import {
   AtSign, Calendar, Clock, Zap, AlertCircle, Link, LayoutTemplate,
   CheckSquare, Circle, BookMarked,
 } from "lucide-react";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDate, formatTime, getPriorityColor } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -234,6 +234,8 @@ export default function MarketingPage() {
   const [quickTaskFor, setQuickTaskFor] = useState<{ date: string; label: string } | null>(null);
   const [quickTaskTitle, setQuickTaskTitle] = useState("");
   const [quickTaskLoading, setQuickTaskLoading] = useState(false);
+  const [quickTaskMode, setQuickTaskMode] = useState<"select" | "create">("select");
+  const [taskSearch, setTaskSearch] = useState("");
 
   // ── Data fetching ────────────────────────────────────────────────────────────
 
@@ -416,6 +418,24 @@ export default function MarketingPage() {
       setQuickTaskTitle("");
       fetchData();
     } finally { setQuickTaskLoading(false); }
+  }
+
+  async function linkTaskToMilestone(taskId: string, date: string) {
+    await fetch(`/api/events/${id}/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dueDate: new Date(date).toISOString() }),
+    });
+    setQuickTaskFor(null);
+    setTaskSearch("");
+    fetchData();
+  }
+
+  function openQuickTask(date: string, key: string) {
+    setQuickTaskFor({ date, label: key });
+    setQuickTaskTitle("");
+    setTaskSearch("");
+    setQuickTaskMode(tasks.some(t => t.status !== "DONE") ? "select" : "create");
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -773,17 +793,67 @@ export default function MarketingPage() {
                         </div>
                       )}
 
-                      {/* Quick add task inline */}
+                      {/* Quick task panel */}
                       {isQuickTaskOpen && (
-                        <div className="flex gap-2 mt-2">
-                          <input autoFocus type="text" value={quickTaskTitle}
-                            onChange={e => setQuickTaskTitle(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") createQuickTask(); if (e.key === "Escape") setQuickTaskFor(null); }}
-                            placeholder="Task title..." className="input-field text-xs py-1 flex-1" />
-                          <button onClick={createQuickTask} disabled={quickTaskLoading} className="btn-primary text-xs px-3 py-1">
-                            {quickTaskLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
-                          </button>
-                          <button onClick={() => setQuickTaskFor(null)} className="btn-ghost text-xs px-2 py-1"><X className="w-3 h-3" /></button>
+                        <div className="mt-3 border border-dj-border/40 rounded-xl bg-dj-900/60 p-3">
+                          <div className="flex items-center gap-2 mb-3">
+                            <button onClick={() => setQuickTaskMode("select")}
+                              className={`text-xs px-3 py-1 rounded-full border transition-all ${quickTaskMode === "select" ? "bg-dj-primary/20 border-dj-primary/40 text-dj-primary-light" : "border-dj-border text-dj-muted hover:text-dj-text"}`}>
+                              Link existing
+                            </button>
+                            <button onClick={() => setQuickTaskMode("create")}
+                              className={`text-xs px-3 py-1 rounded-full border transition-all ${quickTaskMode === "create" ? "bg-dj-primary/20 border-dj-primary/40 text-dj-primary-light" : "border-dj-border text-dj-muted hover:text-dj-text"}`}>
+                              Create new
+                            </button>
+                            <button onClick={() => setQuickTaskFor(null)} className="ml-auto text-dj-muted hover:text-dj-text p-0.5">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {quickTaskMode === "select" ? (
+                            <div>
+                              <input type="text" value={taskSearch}
+                                onChange={e => setTaskSearch(e.target.value)}
+                                placeholder="Search tasks..." className="input-field text-xs py-1 mb-2" autoFocus />
+                              <div className="space-y-0.5 max-h-44 overflow-y-auto">
+                                {(() => {
+                                  const filtered = tasks.filter(t =>
+                                    t.status !== "DONE" &&
+                                    (!taskSearch || t.title.toLowerCase().includes(taskSearch.toLowerCase()))
+                                  );
+                                  if (filtered.length === 0) return (
+                                    <div className="text-center py-3">
+                                      <p className="text-xs text-dj-muted mb-2">
+                                        {tasks.filter(t => t.status !== "DONE").length === 0 ? "No open tasks yet." : "No tasks match your search."}
+                                      </p>
+                                      <button onClick={() => setQuickTaskMode("create")} className="text-xs text-dj-primary-light hover:underline">
+                                        Create a new task →
+                                      </button>
+                                    </div>
+                                  );
+                                  return filtered.map(t => (
+                                    <button key={t.id} onClick={() => linkTaskToMilestone(t.id, quickTaskFor!.date)}
+                                      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-dj-700 transition-colors group">
+                                      <Circle className="w-3 h-3 text-dj-muted flex-shrink-0" />
+                                      <span className="text-xs text-dj-text flex-1 truncate">{t.title}</span>
+                                      <span className={`text-xs flex-shrink-0 ${getPriorityColor(t.priority)}`}>{t.priority}</span>
+                                      <span className="text-xs text-dj-primary-light opacity-0 group-hover:opacity-100 flex-shrink-0 ml-1">Link →</span>
+                                    </button>
+                                  ));
+                                })()}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <input autoFocus type="text" value={quickTaskTitle}
+                                onChange={e => setQuickTaskTitle(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") createQuickTask(); if (e.key === "Escape") setQuickTaskFor(null); }}
+                                placeholder="Task title..." className="input-field text-xs py-1 flex-1" />
+                              <button onClick={createQuickTask} disabled={quickTaskLoading} className="btn-primary text-xs px-3 py-1">
+                                {quickTaskLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -796,7 +866,7 @@ export default function MarketingPage() {
                           <Zap className="w-3 h-3" /> Post
                         </button>
                       )}
-                      <button onClick={() => { setQuickTaskFor({ date: m.date.toISOString().split("T")[0], label: m.key }); setQuickTaskTitle(""); }}
+                      <button onClick={() => openQuickTask(m.date.toISOString().split("T")[0], m.key)}
                         className="flex items-center gap-1.5 text-xs btn-secondary px-3 py-1.5">
                         <BookMarked className="w-3 h-3" /> Task
                       </button>
