@@ -212,6 +212,10 @@ export default function MarketingPage() {
   const [platformFilter, setPlatformFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter]     = useState<string>("ALL");
 
+  // Campaign milestone date overrides: key = daysOffset, value = ISO date string
+  const [milestoneDates, setMilestoneDates] = useState<Record<number, string>>({});
+  const [editingMilestone, setEditingMilestone] = useState<number | null>(null);
+
   // ── Data fetching ────────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
@@ -320,6 +324,7 @@ export default function MarketingPage() {
   // ── Campaign planner helpers ──────────────────────────────────────────────────
 
   function getMilestoneDate(daysOffset: number): Date {
+    if (milestoneDates[daysOffset]) return new Date(milestoneDates[daysOffset]);
     const d = new Date(event!.startDate);
     d.setDate(d.getDate() + daysOffset);
     return d;
@@ -587,11 +592,32 @@ export default function MarketingPage() {
                 <div key={m.daysOffset} className={`card p-4 border ${covered ? "border-emerald-500/20" : isPast ? "border-red-500/10" : "border-dj-border"}`}>
                   <div className="flex items-start gap-4">
                     {/* Date column */}
-                    <div className="flex-shrink-0 text-center w-16">
-                      <p className="text-xs text-dj-muted">{formatDate(milestoneDate, "MMM d")}</p>
-                      <p className={`text-xs font-medium mt-0.5 ${isPast ? "text-dj-muted" : daysUntil <= 3 ? "text-amber-400" : "text-dj-text"}`}>
-                        {isPast ? `${Math.abs(daysUntil)}d ago` : daysUntil === 0 ? "Today!" : `${daysUntil}d away`}
-                      </p>
+                    <div className="flex-shrink-0 text-center w-20">
+                      {editingMilestone === m.daysOffset ? (
+                        <input
+                          type="date"
+                          defaultValue={milestoneDate.toISOString().split("T")[0]}
+                          className="input-field text-xs px-1 py-1 w-full"
+                          autoFocus
+                          onBlur={(e) => {
+                            if (e.target.value) setMilestoneDates(d => ({ ...d, [m.daysOffset]: e.target.value }));
+                            setEditingMilestone(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            if (e.key === "Escape") { setEditingMilestone(null); }
+                          }}
+                        />
+                      ) : (
+                        <button onClick={() => setEditingMilestone(m.daysOffset)}
+                          className="group text-center w-full hover:bg-dj-700 rounded-lg p-1 transition-colors">
+                          <p className="text-xs text-dj-muted group-hover:text-dj-primary-light">{formatDate(milestoneDate, "MMM d")}</p>
+                          <p className={`text-xs font-medium mt-0.5 ${isPast ? "text-dj-muted" : daysUntil <= 3 ? "text-amber-400" : "text-dj-text"}`}>
+                            {isPast ? `${Math.abs(daysUntil)}d ago` : daysUntil === 0 ? "Today!" : `${daysUntil}d away`}
+                          </p>
+                          <p className="text-xs text-dj-muted/50 group-hover:text-dj-muted mt-0.5">tap to edit</p>
+                        </button>
+                      )}
                     </div>
 
                     {/* Content */}

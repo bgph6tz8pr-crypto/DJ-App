@@ -85,7 +85,7 @@ export default function TasksPage() {
         body: JSON.stringify({
           ...form,
           assigneeId: form.assigneeId || null,
-          dueDate: form.dueDate || null,
+          dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
           category: form.category || null,
         }),
       });
