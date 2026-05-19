@@ -268,11 +268,13 @@ export default function MarketingPage() {
 
   // ── Asset helpers ─────────────────────────────────────────────────────────────
 
-  async function handleAssetUpload(file: File): Promise<string | null> {
-    const fd = new FormData();
-    fd.append("file", file); fd.append("eventId", id); fd.append("type", "asset");
-    const res = await fetch("/api/upload", { method: "POST", body: fd });
-    return res.ok ? (await res.json()).url : null;
+  function handleAssetUpload(file: File): Promise<string | null> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
   }
 
   async function saveAsset() {
