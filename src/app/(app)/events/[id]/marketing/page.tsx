@@ -283,7 +283,7 @@ export default function MarketingPage() {
     try {
       let url = assetForm.url;
       if (uploadFile) { const u = await handleAssetUpload(uploadFile); if (u) url = u; }
-      if (!url) { alert("Please provide an image URL or upload a file."); return; }
+      if (!url) { alert("Please choose an image file to upload."); return; }
       await fetch(`/api/events/${id}/flyer-assets`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...assetForm, url }),
@@ -1016,13 +1016,15 @@ export default function MarketingPage() {
                 </select>
               </div>
               <div>
-                <label className="label">Upload File</label>
-                <input type="file" accept="image/*" onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
+                <label className="label">Image File</label>
+                <input type="file" accept="image/*" onChange={e => { setUploadFile(e.target.files?.[0] ?? null); setAssetForm(f => ({ ...f, url: "" })); }}
                   className="input-field py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-dj-primary file:text-white" />
-              </div>
-              <div>
-                <label className="label">Or Image URL</label>
-                <input type="url" value={assetForm.url} onChange={e => setAssetForm(f => ({ ...f, url: e.target.value }))} className="input-field" placeholder="https://..." />
+                {!uploadFile && (
+                  <div className="mt-2">
+                    <label className="label text-dj-muted">Or paste an image URL</label>
+                    <input type="text" value={assetForm.url} onChange={e => setAssetForm(f => ({ ...f, url: e.target.value }))} className="input-field" placeholder="https://..." />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="label">Description</label>
@@ -1030,7 +1032,7 @@ export default function MarketingPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowAssetForm(false)} className="btn-secondary flex-1">Cancel</button>
+              <button onClick={() => { setShowAssetForm(false); setUploadFile(null); setAssetForm({ name: "", url: "", type: "DJ_PHOTO", description: "" }); }} className="btn-secondary flex-1">Cancel</button>
               <button onClick={saveAsset} disabled={assetUploading} className="btn-primary flex-1 flex items-center justify-center gap-2">
                 {assetUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Upload
               </button>
