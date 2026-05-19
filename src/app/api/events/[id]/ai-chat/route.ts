@@ -310,7 +310,7 @@ export async function POST(
 ) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response(
-      `data: ${JSON.stringify({ type: "error", message: "ANTHROPIC_API_KEY is not configured. Add it to your .env.local file." })}\n\ndata: ${JSON.stringify({ type: "done" })}\n\n`,
+      `data: ${JSON.stringify({ type: "error", message: "ANTHROPIC_API_KEY is not set. Add it in your Vercel project → Settings → Environment Variables, then redeploy." })}\n\ndata: ${JSON.stringify({ type: "done" })}\n\n`,
       { headers: { "Content-Type": "text/event-stream" } }
     );
   }
