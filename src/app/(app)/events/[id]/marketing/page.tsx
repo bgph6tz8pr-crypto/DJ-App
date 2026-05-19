@@ -207,6 +207,7 @@ export default function MarketingPage() {
   const [assetForm, setAssetForm] = useState({ name: "", url: "", type: "DJ_PHOTO", description: "" });
   const [assetUploading, setAssetUploading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [previewAsset, setPreviewAsset] = useState<FlyerAsset | null>(null);
 
   // Post state
   const [showPostForm, setShowPostForm]       = useState(false);
@@ -545,16 +546,15 @@ export default function MarketingPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {assets.map((asset) => (
-                <div key={asset.id} className="card overflow-hidden group">
+                <div key={asset.id} className="card overflow-hidden group cursor-pointer" onClick={() => setPreviewAsset(asset)}>
                   <div className="aspect-square bg-dj-700 relative">
                     <img src={asset.url} alt={asset.name} className="w-full h-full object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <a href={asset.url} target="_blank" rel="noopener noreferrer"
-                        className="p-2 bg-dj-800/80 rounded-lg text-white hover:bg-dj-700">
+                      <div className="p-2 bg-dj-800/80 rounded-lg text-white">
                         <ExternalLink className="w-4 h-4" />
-                      </a>
-                      <button onClick={() => deleteAsset(asset.id)}
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); deleteAsset(asset.id); }}
                         className="p-2 bg-red-500/20 rounded-lg text-red-400 hover:bg-red-500/40">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -992,6 +992,31 @@ export default function MarketingPage() {
                 {editingCustomId ? "Save Changes" : "Add Milestone"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ASSET PREVIEW LIGHTBOX ──────────────────────────────────────────── */}
+      {previewAsset && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setPreviewAsset(null)}>
+          <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-white">{previewAsset.name}</h3>
+                {previewAsset.description && <p className="text-xs text-dj-muted mt-0.5">{previewAsset.description}</p>}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { const a = document.createElement("a"); a.href = previewAsset.url; a.download = previewAsset.name; a.click(); }}
+                  className="flex items-center gap-1.5 text-xs btn-secondary px-3 py-1.5">
+                  <ExternalLink className="w-3.5 h-3.5" /> Download
+                </button>
+                <button onClick={() => setPreviewAsset(null)} className="text-dj-muted hover:text-white p-1">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <img src={previewAsset.url} alt={previewAsset.name} className="w-full rounded-xl max-h-[70vh] object-contain bg-dj-900" />
           </div>
         </div>
       )}
